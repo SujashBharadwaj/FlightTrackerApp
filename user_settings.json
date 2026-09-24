@@ -1,0 +1,15 @@
+{
+  "latitude": 19.09,
+  "longitude": 72.87,
+  "radius_km": 30.0,
+  "speed": "Fast (30s)",
+  "notifications_enabled": true,
+  "notification_mode": "LOW_ALTITUDE",
+  "target_callsigns": [
+    "6E",
+    "SEJ5023"
+  ],
+  "max_altitude_meters": 1000000000000000.0,
+  "window_width": 700,
+  "window_height": 550
+}
