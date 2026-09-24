@@ -36,9 +36,10 @@ DEFAULT_NOTIFICATIONS_ENABLED = True
 DEFAULT_TARGET_CALLSIGNS = []
 
 # ─── Ground Filtering ───────────────────────────────────────────────────────
-# When True, aircraft on the ground (taxiing, parked) are excluded from
-# notifications and only airborne flights overhead are tracked.
+# When False, aircraft on the ground (taxiing, parked) are excluded from
+# the map and notifications. Can be toggled live via the UI.
 IGNORE_GROUND_VEHICLES = True
+DEFAULT_SHOW_GROUNDED = False
 MIN_AIRBORNE_ALTITUDE_M = 150  # Minimum altitude to be considered "overhead"
 
 # Altitude threshold for LOW_ALTITUDE mode (meters)
@@ -76,6 +77,7 @@ def _default_settings() -> dict:
         "notification_mode": DEFAULT_NOTIFICATION_MODE,
         "target_callsigns": DEFAULT_TARGET_CALLSIGNS,
         "max_altitude_meters": DEFAULT_MAX_ALTITUDE_METERS,
+        "show_grounded": DEFAULT_SHOW_GROUNDED,
         "window_width": WIDGET_WIDTH,
         "window_height": WIDGET_HEIGHT,
     }

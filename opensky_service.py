@@ -107,12 +107,14 @@ class OpenSkyWorker(threading.Thread):
         interval_seconds: int,
         result_queue: queue.Queue,
         status_queue: queue.Queue,
+        show_grounded: bool = False,
     ):
         super().__init__(daemon=True)
         self.center_lat = center_lat
         self.center_lon = center_lon
         self.radius_km = radius_km
         self._interval = interval_seconds
+        self.show_grounded = show_grounded
         self.result_queue = result_queue
         self.status_queue = status_queue
         self._stop_event = threading.Event()
@@ -126,6 +128,12 @@ class OpenSkyWorker(threading.Thread):
         self._callsigns_lock = threading.Lock()
 
     # ── Public controls ─────────────────────────────────────────────────────
+
+    def set_show_grounded(self, show: bool) -> None:
+        """Enable or disable tracking of grounded / taxiing aircraft."""
+        with self._geofence_lock:
+            self.show_grounded = bool(show)
+        logger.info("Show grounded changed to %s", show)
 
     def set_interval(self, seconds: int) -> None:
         """Update the polling interval (called from GUI thread)."""
@@ -184,6 +192,7 @@ class OpenSkyWorker(threading.Thread):
             c_lat = self.center_lat
             c_lon = self.center_lon
             r_km = self.radius_km
+            show_ground = self.show_grounded
         bbox = compute_bounding_box(c_lat, c_lon, r_km)
 
         try:
@@ -234,7 +243,7 @@ class OpenSkyWorker(threading.Thread):
                 c_lat,
                 c_lon,
                 r_km,
-                filter_ground=IGNORE_GROUND_VEHICLES,
+                filter_ground=not show_ground,
             )
             if aircraft is not None:
                 flights.append(aircraft)
@@ -250,5 +259,10 @@ class OpenSkyWorker(threading.Thread):
 
         self.result_queue.put(flights)
         airborne_count = len([f for f in flights if not f.get("on_ground")])
-        self.status_queue.put(f"live:{airborne_count}")
-        logger.info("Fetched %d states, %d airborne within geofence.", len(states), len(flights))
+        ground_count = len([f for f in flights if f.get("on_ground")])
+        if show_ground and ground_count > 0:
+            self.status_queue.put(f"live:{airborne_count} air · {ground_count} ground")
+        else:
+            self.status_queue.put(f"live:{airborne_count} airborne")
+        logger.info("Fetched %d states, %d total (%d airborne, %d ground) within geofence.",
+                    len(states), len(flights), airborne_count, ground_count)

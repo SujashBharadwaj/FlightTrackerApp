@@ -86,8 +86,17 @@ class TrackerAPI:
             "notification_mode": self._settings["notification_mode"],
             "target_callsigns": self._settings["target_callsigns"],
             "max_altitude_meters": self._settings["max_altitude_meters"],
+            "show_grounded": self._settings.get("show_grounded", False),
             "radius_options": RADIUS_OPTIONS,
         }
+
+    def set_show_grounded(self, show):
+        """Toggle displaying grounded / taxiing planes."""
+        show = bool(show)
+        self._settings["show_grounded"] = show
+        self._worker.set_show_grounded(show)
+        save_settings(self._settings)
+        logger.info("Show grounded changed to %s", show)
 
     def set_radius(self, km):
         """Switch the geofence radius. Called from the JS radius buttons."""
@@ -206,6 +215,7 @@ def on_loaded(window, settings, worker, notif_mgr, flight_queue, status_queue):
         "notification_mode": settings["notification_mode"],
         "target_callsigns": settings["target_callsigns"],
         "max_altitude_meters": settings["max_altitude_meters"],
+        "show_grounded": settings.get("show_grounded", False),
         "radius_options": RADIUS_OPTIONS,
     }
     config_json = json.dumps(config)
@@ -252,6 +262,7 @@ if __name__ == "__main__":
         interval_seconds=interval,
         result_queue=flight_queue,
         status_queue=status_queue,
+        show_grounded=settings.get("show_grounded", False),
     )
     worker.start()
 

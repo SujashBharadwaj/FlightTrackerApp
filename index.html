@@ -59,6 +59,15 @@
     .radius-btn:hover { background: #30363d; color: #e6edf3; }
     .radius-btn.active { background: rgba(240, 160, 48, 0.2); border-color: #f0a030; color: #f0c040; }
 
+    /* ─── Ground Toggle Button ────────────────────────────────────────── */
+    .ground-btn {
+      background: #21262d; border: 1px solid #30363d; color: #8b949e;
+      font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+      cursor: pointer; transition: all 0.15s; margin-right: 6px; white-space: nowrap;
+    }
+    .ground-btn:hover { background: #30363d; color: #e6edf3; }
+    .ground-btn.active { background: rgba(56, 139, 253, 0.2); border-color: #388bfd; color: #58a6ff; }
+
     /* ─── Speed Selector ─────────────────────────────────────────────── */
     .speed-select {
       background: #21262d; border: 1px solid #30363d; color: #e6edf3;
@@ -200,6 +209,9 @@
     <!-- Radius buttons -->
     <div class="radius-bar" id="radius-bar"></div>
 
+    <!-- Ground planes toggle button -->
+    <button class="ground-btn" id="btn-ground" title="Toggle ground / taxiing planes" onclick="toggleGroundPlanes()">🛬 Ground</button>
+
     <!-- Speed selector -->
     <select class="speed-select" id="speed-select">
       <option value="30">Fast (30s)</option>
@@ -305,12 +317,31 @@
     let notifMode = "ALL";
     let targetCallsigns = [];
     let maxAltitude = 1500;
+    let showGrounded = false;
     let latestFlights = [];
 
     /* ================================================================
        AIRPLANE SVG ICON FACTORY
        ================================================================ */
-    function createAirplaneIcon(heading, color) {
+    function createAirplaneIcon(heading, color, isGrounded) {
+      if (isGrounded) {
+        color = '#58a6ff'; // Distinct cool blue for ground/taxiing aircraft
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+          <circle cx="14" cy="14" r="11" fill="rgba(88, 166, 255, 0.2)" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="3 2"/>
+          <g transform="rotate(${heading || 0}, 14, 14)">
+            <path d="M14 4 L16 11 L23 13 L16 14.5 L17 21 L14 18.5 L11 21 L12 14.5 L5 13 L12 11 Z"
+                  fill="${color}" stroke="#1f6feb" stroke-width="0.7"/>
+          </g>
+        </svg>`;
+        return L.divIcon({
+          html: svg,
+          className: 'aircraft-marker ground-marker',
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+          tooltipAnchor: [0, -16],
+        });
+      }
+
       color = color || '#FFD700';
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
         <g transform="rotate(${heading || 0}, 16, 16)">
@@ -383,6 +414,11 @@
       // Build radius buttons
       buildRadiusButtons(config.radius_options || [5, 10, 15, 20, 30]);
 
+      // Apply ground toggle UI state
+      showGrounded = config.show_grounded === true;
+      const gBtn = document.getElementById('btn-ground');
+      if (gBtn) gBtn.classList.toggle('active', showGrounded);
+
       // Apply notification UI state
       const toggle = document.getElementById('notif-toggle');
       if (notificationsEnabled) toggle.classList.add('on');
@@ -427,7 +463,7 @@
     }
 
     /* ================================================================
-       RADIUS BUTTONS
+       RADIUS BUTTONS & GROUND TOGGLE
        ================================================================ */
     function buildRadiusButtons(options) {
       const bar = document.getElementById('radius-bar');
@@ -454,6 +490,15 @@
       }
     }
 
+    function toggleGroundPlanes() {
+      showGrounded = !showGrounded;
+      const btn = document.getElementById('btn-ground');
+      if (btn) btn.classList.toggle('active', showGrounded);
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_show_grounded(showGrounded);
+      }
+    }
+
     /* ================================================================
        FLIGHT MARKERS UPDATE
        ================================================================ */
@@ -464,12 +509,13 @@
       markers = [];
 
       flights.forEach(f => {
-        const icon = createAirplaneIcon(f.heading, '#FFD700');
+        const isGrounded = !!f.on_ground;
+        const icon = createAirplaneIcon(f.heading, '#FFD700', isGrounded);
         const marker = L.marker([f.latitude, f.longitude], { icon: icon })
           .addTo(map);
 
         // Tooltip with callsign + altitude
-        const altStr = f.altitude != null ? f.altitude + 'm' : '';
+        const altStr = isGrounded ? '[GND]' : (f.altitude != null ? f.altitude + 'm' : '');
         const label = (f.callsign + ' ' + altStr).trim();
         marker.bindTooltip(label, {
           permanent: false, direction: 'top', className: 'aircraft-tooltip', offset: [0, -4],
@@ -529,7 +575,9 @@
       document.getElementById('card-icao').textContent = '  ' + (flight.icao24 || '').toUpperCase();
 
       // Altitude
-      if (flight.altitude != null) {
+      if (flight.on_ground) {
+        document.getElementById('card-alt').textContent = 'On Ground (Taxi / Parked)';
+      } else if (flight.altitude != null) {
         const altFt = flight.altitude_ft != null ? Math.round(flight.altitude_ft) : Math.round(flight.altitude * 3.281);
         document.getElementById('card-alt').textContent = flight.altitude + 'm / ' + altFt + ' ft';
       } else {
